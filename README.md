@@ -2,9 +2,11 @@
 
 A Telegram bot for Meera Pillai (founder, Skinstinct). It watches her private
 Telegram notes channel, decides which fragments are substantive enough to
-become a LinkedIn post, drafts the post in her voice, and sends the draft
-back to her on Telegram for approval — with inline Approve / Reject buttons.
-Rejecting a draft with a reason triggers a revision.
+become a LinkedIn post, drafts the post in her voice, and posts the draft
+back into that same channel for approval — with inline Approve / Reject
+buttons. Rejecting a draft with a reason (posted as a reply in the channel)
+triggers a revision. Everything — raw notes, drafts, approvals, feedback —
+happens in the one channel; there's no separate private chat to manage.
 
 It never posts to LinkedIn and never runs unattended end-to-end — every
 draft needs her explicit approval. There's no database: state is a single
@@ -23,7 +25,7 @@ Telegram channel  --channel_post-->  bot collects & stores new notes locally
                      Step B: Gemini drafts post (voice skill + note +
                              best-effort current-events grounding)
                                               |
-                  Bot sends draft to Meera with Approve / Reject buttons
+              Bot posts the draft back to the channel with Approve / Reject buttons
                                               |
                 Approve -> done, nothing else happens
                 Reject + reason -> Step C: Gemini revises (max 2 rounds)
@@ -51,14 +53,15 @@ posted, so it has to be online to capture new notes as they come in.
    ```
    - `GEMINI_API_KEY` — from Google AI Studio.
    - `TELEGRAM_BOT_TOKEN` — from [@BotFather](https://t.me/BotFather).
-   - `TELEGRAM_CHANNEL_ID` — the numeric id of Meera's private notes channel
-     (looks like `-1001234567890`). The bot must be added to that channel
+   - `TELEGRAM_CHANNEL_ID` — the numeric id of Meera's private notes channel.
+     **Must include the leading minus sign** — real Telegram channel/supergroup
+     ids look like `-1001234567890`, not `1001234567890`. If it's wrong, the
+     bot silently ignores every post from the channel (it now logs the actual
+     chat id it's seeing when this happens, so check the console output if
+     nothing seems to react). The bot must also be added to the channel
      **as an admin** — the Bot API only delivers channel posts to bots that
      are channel admins.
-3. Message the bot privately and send `/start` **once** — this is how it
-   learns where to send auto-generated drafts. It only needs to be done
-   again if you switch which chat should receive drafts.
-4. Run it:
+3. Run it:
    ```bash
    npm run dev
    ```
@@ -74,32 +77,37 @@ always-on machine/VM all work).
 
 ## Using it
 
-- **Automatically:** once running (and after the one-time `/start`), the bot
-  records every text (or captioned) message posted to the channel — voice
-  notes too, transcribed via Gemini's audio understanding, since Telegram's
-  Bot API has no transcript field of its own (voice-to-text there is a
-  client-side Premium feature, not something bots can read). ~2 minutes
-  after the last note, it automatically:
+Everything below happens inside the one channel — no private chat with the
+bot is needed at any point.
+
+- **Automatically:** once running, the bot records every text (or captioned)
+  message posted to the channel — voice notes too, transcribed via Gemini's
+  audio understanding, since Telegram's Bot API has no transcript field of
+  its own (voice-to-text there is a client-side Premium feature, not
+  something bots can read). ~2 minutes after the last note, it automatically:
   1. Pulls every note posted since the last run.
   2. Asks Gemini to cluster related notes and decide, per cluster, whether
      it's worth turning into a post (using the five-beat structure from
      `context/meera-voice-skill.md` as the rubric). Every note is marked
      processed either way, so nothing gets evaluated twice.
   3. For each cluster judged worth it, fetches a best-effort current-events
-     reference and drafts a LinkedIn post in Meera's voice, then sends it
-     back with **Approve** / **Reject** buttons and a note on which source
-     message(s) it came from.
+     reference and drafts a LinkedIn post in Meera's voice, then posts it
+     back to the channel with **Approve** / **Reject** buttons and a note on
+     which source message(s) it came from.
   A voice note is logged as skipped, rather than failing the run, only if
-  the audio turns out empty or unintelligible.
-- **On demand:** send the bot `/generate` in the private chat any time to run
-  the same steps immediately instead of waiting for the debounce window.
+  the audio turns out empty or unintelligible. A thin, purely instructional,
+  or off-voice note (e.g. "write me a post about X") is correctly filtered
+  out at step 2 rather than forced into a draft — that's the worth-it filter
+  working as intended, not a bug.
+- **On demand:** post `/generate` to the channel any time to run the same
+  steps immediately instead of waiting for the debounce window.
 - **Approve:** the draft is marked done. The bot takes no further action —
   posting to LinkedIn is entirely manual, by design.
-- **Reject:** the bot asks why. Reply with your reason as a normal text
-  message, and it regenerates the draft using that feedback, the original
-  note(s), and the same voice skill. Capped at 2 revision rounds — after
-  that it tells you it's out of revisions and asks if you want to handle it
-  manually rather than looping forever.
+- **Reject:** the bot asks why, in the channel. Reply with your reason as a
+  normal text post, and it regenerates the draft using that feedback, the
+  original note(s), and the same voice skill. Capped at 2 revision rounds —
+  after that it tells you it's out of revisions and asks if you want to
+  handle it manually rather than looping forever.
 
 ## Notes on the voice skill file
 

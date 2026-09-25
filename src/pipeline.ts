@@ -10,7 +10,7 @@ import {
   draftPost,
   revisePost,
 } from "./gemini.js";
-import { MAX_REVISIONS, AUTO_GENERATE_DEBOUNCE_MS } from "./config.js";
+import { config, MAX_REVISIONS, AUTO_GENERATE_DEBOUNCE_MS } from "./config.js";
 import type { NoteRecord, PendingDraft, BotState } from "./types.js";
 
 let voiceSkillCache: string | null = null;
@@ -50,16 +50,8 @@ export async function recordNote(note: NoteRecord): Promise<void> {
   await saveState(state);
 }
 
-/** Called once, on /start — remembers where to send auto-generated drafts. */
-export async function setOwnerChat(bot: Bot, chatId: number): Promise<void> {
-  const state = await loadState();
-  const alreadyKnown = state.ownerChatId === chatId;
-  state.ownerChatId = chatId;
-  await saveState(state);
-  if (!alreadyKnown && state.notes.some((n) => !n.used)) {
-    scheduleAutoGenerate(bot);
-  }
-}
+/** Everything — raw notes, drafts, approval, feedback — happens in this one channel. */
+export const CHANNEL_CHAT_ID = Number(config.telegramChannelId);
 
 let debounceTimer: NodeJS.Timeout | null = null;
 
@@ -77,16 +69,7 @@ export function scheduleAutoGenerate(
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
-    void (async () => {
-      const state = await loadState();
-      if (!state.ownerChatId) {
-        console.log(
-          "[auto-generate] skipped — no owner chat yet (send /start to the bot once)."
-        );
-        return;
-      }
-      await runGenerate(bot, state.ownerChatId);
-    })();
+    void runGenerate(bot, CHANNEL_CHAT_ID);
   }, delayMs);
 }
 

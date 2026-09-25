@@ -32,8 +32,6 @@ export interface BotState {
   pendingDrafts: PendingDraft[];
   /** Draft id currently waiting on a free-text rejection reason, if any. */
   awaitingFeedbackForDraftId: string | null;
-  /** Meera's private chat id with the bot, captured on /start, used to send auto-generated drafts. */
-  ownerChatId: number | null;
 }
 
 export interface ClusterDecision {

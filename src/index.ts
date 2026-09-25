@@ -17,7 +17,7 @@ async function main() {
   console.log("Starting bot (long polling)...");
   await bot.start({
     onStart: (botInfo) => {
-      console.log(`Bot @${botInfo.username} is running. Send /start in a private chat with it, then just post notes to the channel.`);
+      console.log(`Bot @${botInfo.username} is running. Just post notes to the channel — drafts and Approve/Reject will show up there too.`);
     },
   });
 }
