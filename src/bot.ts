@@ -8,7 +8,7 @@ import {
   handleFeedbackReply,
   isAwaitingFeedback,
   recordNote,
-  scheduleAutoGenerate,
+  triggerGenerate,
   CHANNEL_CHAT_ID,
 } from "./pipeline.js";
 import { transcribeVoiceNote } from "./gemini.js";
@@ -20,7 +20,7 @@ export function createBot(): Bot {
   bot.command("start", async (ctx) => {
     if (ctx.chat?.id !== CHANNEL_CHAT_ID) return;
     await ctx.reply(
-      "I watch this channel and turn worth-it fragments into LinkedIn drafts.\n\nI'll draft automatically a couple of minutes after new notes stop coming in — no need to ask. Post /generate any time to check right now instead of waiting."
+      "I watch this channel and turn worth-it fragments into LinkedIn drafts.\n\nI'll draft automatically right after each new note — no need to ask. Post /generate any time to force an immediate check anyway (e.g. to re-run without waiting on a new note)."
     );
   });
 
@@ -78,7 +78,7 @@ export function createBot(): Bot {
       text,
       used: false,
     });
-    scheduleAutoGenerate(bot);
+    await triggerGenerate(bot);
   });
 
   bot.on("callback_query:data", async (ctx) => {

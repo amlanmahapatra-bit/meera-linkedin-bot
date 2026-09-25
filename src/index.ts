@@ -1,17 +1,17 @@
 import { createBot, ensureStateInitialized } from "./bot.js";
 import { loadState } from "./state.js";
-import { scheduleAutoGenerate } from "./pipeline.js";
+import { triggerGenerate } from "./pipeline.js";
 
 async function main() {
   await ensureStateInitialized();
   const bot = createBot();
 
-  // If the process restarted mid-debounce, there may already be unprocessed
-  // notes waiting — pick the auto-generate timer back up rather than waiting
-  // for the next channel post to schedule it.
+  // If the process restarted while notes were still unprocessed (e.g. it
+  // crashed or got redeployed), catch up immediately rather than waiting for
+  // the next channel post.
   const state = await loadState();
   if (state.notes.some((n) => !n.used)) {
-    scheduleAutoGenerate(bot);
+    await triggerGenerate(bot);
   }
 
   console.log("Starting bot (long polling)...");

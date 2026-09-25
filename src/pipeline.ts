@@ -10,7 +10,7 @@ import {
   draftPost,
   revisePost,
 } from "./gemini.js";
-import { config, MAX_REVISIONS, AUTO_GENERATE_DEBOUNCE_MS } from "./config.js";
+import { config, MAX_REVISIONS } from "./config.js";
 import type { NoteRecord, PendingDraft, BotState } from "./types.js";
 
 let voiceSkillCache: string | null = null;
@@ -53,24 +53,9 @@ export async function recordNote(note: NoteRecord): Promise<void> {
 /** Everything — raw notes, drafts, approval, feedback — happens in this one channel. */
 export const CHANNEL_CHAT_ID = Number(config.telegramChannelId);
 
-let debounceTimer: NodeJS.Timeout | null = null;
-
-/**
- * Debounced auto-trigger: called every time a new note comes in (and once
- * at startup, in case the process restarted mid-debounce). Waits for a
- * quiet period so a burst of fragments gets clustered into one run instead
- * of drafted note-by-note, then runs the pipeline automatically — no
- * /generate needed. /generate itself still works for an immediate manual run.
- */
-export function scheduleAutoGenerate(
-  bot: Bot,
-  delayMs: number = AUTO_GENERATE_DEBOUNCE_MS
-): void {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    debounceTimer = null;
-    void runGenerate(bot, CHANNEL_CHAT_ID);
-  }, delayMs);
+/** Runs the pipeline against the notes channel — called right after a new note arrives. */
+export async function triggerGenerate(bot: Bot): Promise<void> {
+  await runGenerate(bot, CHANNEL_CHAT_ID);
 }
 
 export async function runGenerate(bot: Bot, chatId: number): Promise<void> {
