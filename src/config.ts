@@ -24,3 +24,11 @@ export const config = {
 export const GEMINI_MODEL = "gemini-3.1-flash-lite";
 
 export const MAX_REVISIONS = 2;
+
+/**
+ * How long to wait after the last new note before auto-running the
+ * pipeline. Debounced (not fixed-interval) so a burst of fragments posted
+ * close together gets clustered into one evaluation instead of drafted
+ * note-by-note, while still feeling immediate to Meera.
+ */
+export const AUTO_GENERATE_DEBOUNCE_MS = 2 * 60 * 1000;

@@ -10,7 +10,7 @@ import {
   draftPost,
   revisePost,
 } from "./gemini.js";
-import { MAX_REVISIONS } from "./config.js";
+import { MAX_REVISIONS, AUTO_GENERATE_DEBOUNCE_MS } from "./config.js";
 import type { NoteRecord, PendingDraft, BotState } from "./types.js";
 
 let voiceSkillCache: string | null = null;
@@ -48,6 +48,46 @@ export async function recordNote(note: NoteRecord): Promise<void> {
   const state = await loadState();
   state.notes.push(note);
   await saveState(state);
+}
+
+/** Called once, on /start — remembers where to send auto-generated drafts. */
+export async function setOwnerChat(bot: Bot, chatId: number): Promise<void> {
+  const state = await loadState();
+  const alreadyKnown = state.ownerChatId === chatId;
+  state.ownerChatId = chatId;
+  await saveState(state);
+  if (!alreadyKnown && state.notes.some((n) => !n.used)) {
+    scheduleAutoGenerate(bot);
+  }
+}
+
+let debounceTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Debounced auto-trigger: called every time a new note comes in (and once
+ * at startup, in case the process restarted mid-debounce). Waits for a
+ * quiet period so a burst of fragments gets clustered into one run instead
+ * of drafted note-by-note, then runs the pipeline automatically — no
+ * /generate needed. /generate itself still works for an immediate manual run.
+ */
+export function scheduleAutoGenerate(
+  bot: Bot,
+  delayMs: number = AUTO_GENERATE_DEBOUNCE_MS
+): void {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    debounceTimer = null;
+    void (async () => {
+      const state = await loadState();
+      if (!state.ownerChatId) {
+        console.log(
+          "[auto-generate] skipped — no owner chat yet (send /start to the bot once)."
+        );
+        return;
+      }
+      await runGenerate(bot, state.ownerChatId);
+    })();
+  }, delayMs);
 }
 
 export async function runGenerate(bot: Bot, chatId: number): Promise<void> {

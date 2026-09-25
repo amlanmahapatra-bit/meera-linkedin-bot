@@ -8,6 +8,8 @@ import {
   handleFeedbackReply,
   isAwaitingFeedback,
   recordNote,
+  setOwnerChat,
+  scheduleAutoGenerate,
 } from "./pipeline.js";
 
 export function createBot(): Bot {
@@ -15,8 +17,9 @@ export function createBot(): Bot {
 
   bot.command("start", async (ctx) => {
     if (ctx.chat.type !== "private") return;
+    await setOwnerChat(bot, ctx.chat.id);
     await ctx.reply(
-      "I watch your Skinstinct notes channel and turn worth-it fragments into LinkedIn drafts.\n\nUse /generate any time you want me to check for new notes and draft from them. I'll send each draft here with Approve / Reject buttons."
+      "I watch your Skinstinct notes channel and turn worth-it fragments into LinkedIn drafts.\n\nI'll draft automatically a couple of minutes after new notes stop coming in — no need to ask. Send /generate any time you want me to check right now instead of waiting."
     );
   });
 
@@ -25,10 +28,10 @@ export function createBot(): Bot {
     await runGenerate(bot, ctx.chat.id);
   });
 
-  // Capture new notes from the private channel as they're posted. The
-  // Telegram Bot API only surfaces channel messages in real time, so this
-  // listener has to be running continuously to collect them — /generate
-  // itself is still triggered manually, on demand.
+  // Capture new notes from the private channel as they're posted, and
+  // debounce-trigger the pipeline automatically. The Telegram Bot API only
+  // surfaces channel messages in real time, so this listener has to be
+  // running continuously to collect them.
   bot.on("channel_post", async (ctx) => {
     const post = ctx.channelPost;
     if (String(post.chat.id) !== config.telegramChannelId) return;
@@ -47,6 +50,7 @@ export function createBot(): Bot {
       text,
       used: false,
     });
+    scheduleAutoGenerate(bot);
   });
 
   bot.on("callback_query:data", async (ctx) => {

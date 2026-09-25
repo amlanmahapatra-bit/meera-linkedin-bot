@@ -9,6 +9,7 @@ const EMPTY_STATE: BotState = {
   notes: [],
   pendingDrafts: [],
   awaitingFeedbackForDraftId: null,
+  ownerChatId: null,
 };
 
 let cache: BotState | null = null;
