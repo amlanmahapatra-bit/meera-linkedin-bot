@@ -67,6 +67,41 @@ ${notesBlock}`;
 }
 
 /**
+ * Transcribes a voice note. The Telegram Bot API has no transcript field
+ * (client-side voice-to-text is a Telegram Premium UI feature, not exposed
+ * to bots), so this uses Gemini's own audio understanding on the downloaded
+ * file instead. Returns null if the audio is empty/unintelligible so the
+ * caller can fall back to logging it as skipped rather than failing.
+ */
+export async function transcribeVoiceNote(
+  audioBase64: string,
+  mimeType: string
+): Promise<string | null> {
+  try {
+    const response = await ai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: "Transcribe this voice note verbatim, in the language it was spoken in. Reply with only the transcript text, nothing else. If the audio is empty, silent, or not intelligible speech, reply with exactly: NONE",
+            },
+            { inlineData: { mimeType, data: audioBase64 } },
+          ],
+        },
+      ],
+    });
+    const text = response.text?.trim();
+    if (!text || text === "NONE") return null;
+    return text;
+  } catch (err) {
+    console.error("Voice note transcription failed:", err);
+    return null;
+  }
+}
+
+/**
  * Best-effort current-events grounding for a note's topic. Returns null if
  * no good reference is found — a forced, irrelevant reference is worse than
  * none, and the voice never fabricates a source.

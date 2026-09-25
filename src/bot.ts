@@ -11,6 +11,8 @@ import {
   setOwnerChat,
   scheduleAutoGenerate,
 } from "./pipeline.js";
+import { transcribeVoiceNote } from "./gemini.js";
+import { downloadTelegramFile } from "./telegram-files.js";
 
 export function createBot(): Bot {
   const bot = new Bot(config.telegramBotToken);
@@ -36,10 +38,24 @@ export function createBot(): Bot {
     const post = ctx.channelPost;
     if (String(post.chat.id) !== config.telegramChannelId) return;
 
-    const text = post.text ?? post.caption;
+    let text = post.text ?? post.caption;
+
+    // Telegram's Bot API has no transcript field for voice notes (that's a
+    // client-side Premium feature, not available to bots) — so transcribe
+    // it ourselves via Gemini's audio understanding instead.
+    const voiceFile = post.voice ?? post.audio;
+    if (!text && voiceFile) {
+      const downloaded = await downloadTelegramFile(bot, voiceFile.file_id);
+      if (downloaded) {
+        text =
+          (await transcribeVoiceNote(downloaded.base64, downloaded.mimeType)) ??
+          undefined;
+      }
+    }
+
     if (!text) {
       console.log(
-        `[skip] message #${post.message_id} has no text/caption (likely a voice note with no transcript) — skipping.`
+        `[skip] message #${post.message_id} has no text/caption and no usable transcript — skipping.`
       );
       return;
     }

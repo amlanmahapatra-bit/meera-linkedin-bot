@@ -75,8 +75,11 @@ always-on machine/VM all work).
 ## Using it
 
 - **Automatically:** once running (and after the one-time `/start`), the bot
-  records every text (or captioned) message posted to the channel and, ~2
-  minutes after the last one, automatically:
+  records every text (or captioned) message posted to the channel — voice
+  notes too, transcribed via Gemini's audio understanding, since Telegram's
+  Bot API has no transcript field of its own (voice-to-text there is a
+  client-side Premium feature, not something bots can read). ~2 minutes
+  after the last note, it automatically:
   1. Pulls every note posted since the last run.
   2. Asks Gemini to cluster related notes and decide, per cluster, whether
      it's worth turning into a post (using the five-beat structure from
@@ -86,8 +89,8 @@ always-on machine/VM all work).
      reference and drafts a LinkedIn post in Meera's voice, then sends it
      back with **Approve** / **Reject** buttons and a note on which source
      message(s) it came from.
-  Pure voice notes with no transcript are logged as skipped rather than
-  failing the run.
+  A voice note is logged as skipped, rather than failing the run, only if
+  the audio turns out empty or unintelligible.
 - **On demand:** send the bot `/generate` in the private chat any time to run
   the same steps immediately instead of waiting for the debounce window.
 - **Approve:** the draft is marked done. The bot takes no further action —
@@ -118,7 +121,8 @@ context/meera-voice-skill.md   Voice skill, loaded verbatim by the pipeline
 src/config.ts                  Env var loading + validation, model constant
 src/types.ts                   Shared TypeScript types
 src/state.ts                   Local JSON state (read/write), no database
-src/gemini.ts                  Gemini calls: worth-it filter, grounding, draft, revise
+src/gemini.ts                  Gemini calls: worth-it filter, transcription, grounding, draft, revise
+src/telegram-files.ts          Downloads a Telegram file (e.g. a voice note) for transcription
 src/pipeline.ts                Orchestrates the filter -> ground -> draft -> revise flow
 src/bot.ts                     Telegram handlers (channel_post, /generate, buttons, feedback)
 src/index.ts                   Entry point — starts the bot
